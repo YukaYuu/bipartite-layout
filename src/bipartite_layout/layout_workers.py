@@ -5,10 +5,9 @@ processes (bipartite_layout.layout_workers._multi_seed_worker) stays a
 lightweight module with no plotting imports.
 """
 
-from concurrent.futures import ProcessPoolExecutor
-
 import numpy as np
 
+from bipartite_layout.experiment_context import run_worker_tasks
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.metrics import compute_cluster_metrics, compute_separation_metrics
 
@@ -35,11 +34,7 @@ def compute_layout_multi_seed(common_deg, weight, alpha, nodes, is_user, n_seeds
     並列実行する。デフォルトNoneは従来通り逐次実行(結果は完全に同一、速度のみ異なる)。
     """
     tasks = [(common_deg, weight, alpha, nodes, is_user, seed) for seed in range(n_seeds)]
-    if n_workers:
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
-            results = list(executor.map(_multi_seed_worker, tasks))
-    else:
-        results = [_multi_seed_worker(t) for t in tasks]
+    results = run_worker_tasks(_multi_seed_worker, tasks, n_workers)
 
     best_coords, best_stress = None, np.inf
     centroid_seps, nn_ratios = [], []

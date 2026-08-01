@@ -1,5 +1,6 @@
 """Shared helpers used across experiment drivers (dedup target)."""
 
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
@@ -7,6 +8,20 @@ import numpy as np
 
 from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
 from bipartite_layout.config import DEFAULT_CONFIG
+
+
+def run_worker_tasks(worker_fn, tasks, n_workers=None):
+    """
+    n_workersが指定されていればProcessPoolExecutorで並列実行し、Noneなら逐次実行する、
+    という分岐をまとめたヘルパー。compute_layout_multi_seed(1回のバッチ呼び出し)向け。
+    run_b_vs_c_alpha_sweep/run_b_c_d_alpha_sweepはalphaループ全体で1つのexecutorを
+    使い回す(効率のため)ため、あえてこのヘルパーは使わず、独自のtry/finally
+    executorライフサイクルのままにしてある。
+    """
+    if n_workers:
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            return list(executor.map(worker_fn, tasks))
+    return [worker_fn(t) for t in tasks]
 
 
 @dataclass
