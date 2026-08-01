@@ -1,7 +1,55 @@
 """Shared helpers used across experiment drivers (dedup target)."""
 
+from dataclasses import dataclass
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
+from bipartite_layout.config import DEFAULT_CONFIG
+
+
+@dataclass
+class ExperimentContext:
+    G: object
+    nodes: list
+    node_idx: dict
+    common_deg: object
+    weight: object
+    is_user: object
+    edges: object
+    edge_labels: object
+    direction_precomputed: object
+
+
+def build_experiment_context(G, weight_mode="degree", *, graph_build=DEFAULT_CONFIG.graph_build,
+                              include_direction=True):
+    """
+    Gが既に手元にある関数(run_b_vs_c_alpha_sweep/run_b_c_d_alpha_sweep等、Gを引数で
+    直接受け取る関数)向け。get_matrices_cached + get_edge_direction_cachedという
+    2段階のキャッシュ呼び出しを1回のExperimentContext構築にまとめる。
+    """
+    nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
+        G, weight_mode, graph_build.threshold_common_deg,
+        graph_build.top_k_same_type, graph_build.mutual_top_k_only,
+    )
+    edges = edge_labels = direction_precomputed = None
+    if include_direction:
+        edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
+    return ExperimentContext(G, nodes, node_idx, common_deg, weight, is_user,
+                              edges, edge_labels, direction_precomputed)
+
+
+def prepare_experiment_context(M, weight_mode="degree", *, build_kwargs=None,
+                                graph_build=DEFAULT_CONFIG.graph_build,
+                                include_direction=True):
+    """
+    Mからサブグラフを作るところから始める関数(main_repulsion_and_init_ablation等)向け。
+    get_small_subgraph_cached → get_matrices_cached → get_edge_direction_cachedという、
+    複数のmain_*/run_*関数の冒頭で繰り返されていた3段階のセットアップを1回にまとめる。
+    """
+    G = get_small_subgraph_cached(M, **(build_kwargs or {}))
+    return build_experiment_context(G, weight_mode, graph_build=graph_build, include_direction=include_direction)
 
 
 def default_alpha_grid(step=0.05):

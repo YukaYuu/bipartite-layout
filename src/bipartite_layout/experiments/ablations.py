@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
-from bipartite_layout.config import DEFAULT_CONFIG, LARGE_BUILD_KWARGS, SMALL_BUILD_KWARGS
+from bipartite_layout.caching import get_small_subgraph_cached
+from bipartite_layout.config import LARGE_BUILD_KWARGS, SMALL_BUILD_KWARGS
 from bipartite_layout.diagnostics import run_sampling_parameter_sweep
-from bipartite_layout.experiment_context import default_alpha_grid
+from bipartite_layout.experiment_context import build_experiment_context, default_alpha_grid, prepare_experiment_context
 from bipartite_layout.experiments.alpha_sweeps import run_full_experiment
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.metrics import compute_nn_distance_cv
@@ -24,11 +24,10 @@ def main_repulsion_and_init_ablation(M, dataset_label, alphas=None, gamma=0.1, s
     """
     print(f"\n{'#' * 20} [{dataset_label}] 反発・初期配置のablation実験 {'#' * 20}")
 
-    G = get_small_subgraph_cached(M)
-    nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, "degree", DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
-    )
-    edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
+    ctx = prepare_experiment_context(M, weight_mode="degree")
+    G, nodes, node_idx = ctx.G, ctx.nodes, ctx.node_idx
+    common_deg, weight, is_user = ctx.common_deg, ctx.weight, ctx.is_user
+    edges, edge_labels, direction_precomputed = ctx.edges, ctx.edge_labels, ctx.direction_precomputed
 
     if alphas is None:
         alphas = default_alpha_grid()
@@ -80,11 +79,9 @@ def main_weight_mode_image_comparison(M, dataset_label, weight_modes=("uniform",
         alphas = default_alpha_grid()
 
     for weight_mode in weight_modes:
-        nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-            G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
-        )
+        ctx = build_experiment_context(G, weight_mode, include_direction=False)
         print(f"\n--- [{dataset_label}] weight_mode={weight_mode} の画像を生成 ---")
-        plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user, alphas,
+        plot_alpha_grid(G, ctx.common_deg, ctx.weight, ctx.nodes, ctx.node_idx, ctx.is_user, alphas,
                          gamma=gamma, seed=seed, filename=f"alpha_grid_{dataset_label}_{weight_mode}.png")
 
 

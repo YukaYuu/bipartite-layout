@@ -17,13 +17,8 @@ from bipartite_layout.diagnostics import (
     inspect_common_deg_distribution,
     inspect_common_deg_distribution_by_type,
 )
-from bipartite_layout.direction import (
-    calc_direction_alignment_score,
-    calc_edge_similarity,
-    cluster_edges_by_community,
-    precompute_direction_pairs,
-)
-from bipartite_layout.experiment_context import default_alpha_grid, save_figure
+from bipartite_layout.direction import calc_direction_alignment_score
+from bipartite_layout.experiment_context import build_experiment_context, default_alpha_grid, save_figure
 from bipartite_layout.experiments.workers import _bc_seed_worker, _bcd_seed_worker
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.layout_workers import compute_layout_multi_seed
@@ -204,9 +199,7 @@ def gamma_sweep(common_deg, weight, nodes, node_idx, is_user, direction_precompu
 
 def run_three_method_comparison(G, common_deg, weight, nodes, node_idx, is_user,
                                  alphas, n_seeds=10, gamma=0.1):
-    edges, similarity = calc_edge_similarity(G)
-    edge_labels = cluster_edges_by_community(edges, similarity, sim_threshold=0.0, resolution=1.0)
-    direction_precomputed = precompute_direction_pairs(edges, similarity, edge_labels, node_idx)
+    edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
     print(f"\nエッジクラスタ数: {edge_labels.max() + 1}, 方向整列の対象ペア数: {len(direction_precomputed['pair_i'])}")
 
     def run_multi_seed(method, alpha):
@@ -243,9 +236,7 @@ def run_three_method_comparison(G, common_deg, weight, nodes, node_idx, is_user,
 
 def run_three_method_comparison_with_plots(G, common_deg, weight, nodes, node_idx, is_user,
                                             alphas, gamma=0.1, plot_seed=0, out_dir="."):
-    edges, similarity = calc_edge_similarity(G)
-    edge_labels = cluster_edges_by_community(edges, similarity, sim_threshold=0.0, resolution=1.0)
-    direction_precomputed = precompute_direction_pairs(edges, similarity, edge_labels, node_idx)
+    edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
     # 手法A(alpha非依存、1回だけ)
     coords_a, _, conv_a, _, _ = compute_layout_method(
@@ -315,10 +306,9 @@ def run_b_vs_c_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None,
     ProcessPoolExecutorで並列実行する。デフォルトNoneは従来通り逐次実行で、結果(収束数・
     各種平均値)は並列実行でも完全に同一になる(seedで決まる計算内容自体は変わらないため)。
     """
-    nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
-    )
-    edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
+    ctx = build_experiment_context(G, weight_mode)
+    nodes, node_idx, common_deg, weight, is_user = ctx.nodes, ctx.node_idx, ctx.common_deg, ctx.weight, ctx.is_user
+    edges, edge_labels, direction_precomputed = ctx.edges, ctx.edge_labels, ctx.direction_precomputed
 
     if alphas is None:
         alphas = default_alpha_grid()
@@ -416,10 +406,9 @@ def run_b_c_d_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None, 
     run_b_vs_c_alpha_sweepとは別の独立した関数にしてあり、既存のB/C比較の
     実験結果には一切影響しない。
     """
-    nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
-    )
-    edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
+    ctx = build_experiment_context(G, weight_mode)
+    nodes, node_idx, common_deg, weight, is_user = ctx.nodes, ctx.node_idx, ctx.common_deg, ctx.weight, ctx.is_user
+    edges, edge_labels, direction_precomputed = ctx.edges, ctx.edge_labels, ctx.direction_precomputed
 
     if alphas is None:
         alphas = default_alpha_grid()
