@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from bipartite_layout.caching import get_edge_direction_cached
+from bipartite_layout.experiment_context import save_figure
 from bipartite_layout.layout_core import compute_layout_method
 
 
@@ -27,10 +28,7 @@ def plot_and_save(coords, is_user, G, node_idx, title, filename, edge_labels=Non
 
     ax.set_title(title, fontsize=10)
     ax.legend()
-    plt.tight_layout()
-    plt.savefig(filename, dpi=150)
-    plt.close(fig)
-    print(f"保存しました: {filename}")
+    save_figure(fig, filename)
 
 
 def plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user,
@@ -86,11 +84,9 @@ def plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user,
                 if col == 0:
                     ax.set_ylabel(label, fontsize=12, rotation=0, labelpad=20)
 
-        plt.tight_layout()
         out_name = filename.replace(".png", f"_part{chunk_idx+1}.png")
-        plt.savefig(out_name, dpi=130)
-        plt.close(fig)
-        print(f"保存しました: {out_name}（alpha: {[f'{a:.2f}' for a in chunk_alphas]}）")
+        save_figure(fig, out_name, dpi=130,
+                    message=f"保存しました: {out_name}（alpha: {[f'{a:.2f}' for a in chunk_alphas]}）")
 
 
 def plot_ablation_grid(G, common_deg, weight, nodes, node_idx, is_user,
@@ -143,8 +139,6 @@ def plot_ablation_grid(G, common_deg, weight, nodes, node_idx, is_user,
                 if col == 0:
                     ax.set_ylabel(label, fontsize=9, rotation=0, labelpad=45, ha="right")
 
-        plt.tight_layout()
         out_name = filename.replace(".png", f"_part{chunk_idx+1}.png")
-        plt.savefig(out_name, dpi=130)
-        plt.close(fig)
-        print(f"保存しました: {out_name}（alpha: {[f'{a:.2f}' for a in chunk_alphas]}）")
+        save_figure(fig, out_name, dpi=130,
+                    message=f"保存しました: {out_name}（alpha: {[f'{a:.2f}' for a in chunk_alphas]}）")

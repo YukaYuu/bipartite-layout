@@ -7,6 +7,7 @@ from networkx.algorithms.community import louvain_communities, modularity
 
 from bipartite_layout.caching import get_matrices_cached, get_small_subgraph_cached
 from bipartite_layout.config import DEFAULT_CONFIG
+from bipartite_layout.experiment_context import save_figure
 
 
 def inspect_common_deg_distribution(G, save_path="common_deg_distribution.png"):
@@ -29,14 +30,12 @@ def inspect_common_deg_distribution(G, save_path="common_deg_distribution.png"):
         print(f"分位点: min={values.min():.3f}, 25%={np.percentile(values,25):.3f}, "
               f"50%={np.percentile(values,50):.3f}, 75%={np.percentile(values,75):.3f}, max={values.max():.3f}")
 
-    plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(6, 4))
     plt.hist(values, bins=30)
     plt.xlabel("common_deg (Jaccard similarity, > 0 only)")
     plt.ylabel("pair count")
     plt.title("Distribution of common_deg for same-type pairs")
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    print(f"保存しました: {save_path}")
+    save_figure(fig, save_path)
     return values
 
 
@@ -130,9 +129,7 @@ def inspect_common_deg_distribution_by_type(G, save_path="common_deg_distributio
     if DEFAULT_CONFIG.graph_build.threshold_common_deg is not None:
         ax2.axvline(DEFAULT_CONFIG.graph_build.threshold_common_deg, color="black", linestyle="--", linewidth=1)
 
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    print(f"\n保存しました: {save_path}")
+    save_figure(fig, save_path, message=f"\n保存しました: {save_path}")
 
     return user_values, movie_values
 
@@ -305,11 +302,10 @@ def analyze_degree_and_null_model(G, save_path="degree_null_model.png"):
         ax.set_xlim(0, lim)
         ax.set_ylim(0, lim)
 
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    print(f"\n保存しました: {save_path}"
-          "(対角線より上にある点が多いほど、次数だけでは説明できない超過分が"
-          "大きいことを示す)")
+    save_figure(fig, save_path,
+                message=f"\n保存しました: {save_path}"
+                        "(対角線より上にある点が多いほど、次数だけでは説明できない超過分が"
+                        "大きいことを示す)")
 
     return user_obs, user_exp, movie_obs, movie_exp
 
@@ -381,9 +377,7 @@ def analyze_common_neighbor_popularity_bias(G, M, save_path="popularity_bias.png
     ax2.set_ylabel("mean activity of shared users (degree in M)")
     ax2.set_title(f"movie-movie (corr={movie_corr:.3f})")
 
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    print(f"\n保存しました: {save_path}")
+    save_figure(fig, save_path, message=f"\n保存しました: {save_path}")
 
     return user_corr, movie_corr
 

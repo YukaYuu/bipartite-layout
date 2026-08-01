@@ -23,6 +23,7 @@ from bipartite_layout.direction import (
     cluster_edges_by_community,
     precompute_direction_pairs,
 )
+from bipartite_layout.experiment_context import save_figure
 from bipartite_layout.experiments.workers import _bc_seed_worker, _bcd_seed_worker
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.layout_workers import compute_layout_multi_seed
@@ -143,10 +144,8 @@ def run_full_experiment(M, build_kwargs, label, n_seeds=20,
 
     fig.suptitle(f"[{label}] threshold = {threshold}, "
                  f"n_user={n_user_nodes}, n_movie={n_movie_nodes}")
-    plt.tight_layout()
     out_path = f"alpha_layout_th{threshold}_{label}.png"
-    plt.savefig(out_path, dpi=150)
-    print(f"保存しました: {out_path}")
+    save_figure(fig, out_path)
 
     fig2, axes2 = plt.subplots(1, 3, figsize=(15, 4))
     ax1, ax2, ax3 = axes2
@@ -171,10 +170,8 @@ def run_full_experiment(M, build_kwargs, label, n_seeds=20,
     ax3.set_title(f"[{label}] Cluster count vs alpha ({n_seeds} seeds)")
     ax3.legend()
 
-    plt.tight_layout()
     trend_path = f"separation_and_cluster_trend_th{threshold}_{label}.png"
-    plt.savefig(trend_path, dpi=150)
-    print(f"保存しました: {trend_path}")
+    save_figure(fig2, trend_path)
 
     return {
         "label": label, "n_user": n_user_nodes, "n_movie": n_movie_nodes,
