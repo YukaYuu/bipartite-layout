@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bipartite-layout"
+version = "0.1.0"
+description = "Bipartite graph layout optimization mixing stress majorization with direction alignment (MovieLens / DBLP)"
+requires-python = ">=3.10"
+dependencies = [
+    "networkx",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "scikit-learn",
+    "lxml",
+]
+
+[project.optional-dependencies]
+fast = ["numba"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
