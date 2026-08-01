@@ -6,3 +6,4 @@ outputs/
 *.png
 *.pkl
 .DS_Store
+*.egg-info/
