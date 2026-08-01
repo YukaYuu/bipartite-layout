@@ -1,50 +1,98 @@
 """
-Experiment configuration constants.
+Experiment configuration dataclasses.
 
-Plain module constants for now (mirrors the original combined_experiment.py
-exactly) — these get replaced with frozen dataclasses in a follow-up commit.
-Centralizing them here means that later change only touches this file plus
-the handful of call sites that reference them by name.
+Frozen (immutable) dataclasses replace the scattered module constants that
+used to live here as plain values. Frozen dataclass instances are safe to
+use as ordinary function-parameter defaults (same evaluate-once-at-def-time
+semantics as a plain int/float/str constant, no mutable-default bug) --
+they just aren't valid as class-body defaults for *other* dataclasses
+without `field(default_factory=...)`.
 """
 
-DATA_PATH = "/Users/owner/Downloads/filtered-ml-1m/train.txt"
-DBLP_PATH = "/Users/owner/Downloads/dblp.xml"
-DBLP_DTD_PATH = "/Users/owner/Downloads/dblp.dtd"
-DBLP_MAX_PAPERS = 300_000
-# load_dblp_graphの結果をキャッシュするpickleファイル。3.8GBのXMLを毎回パースし直すのは
-# 無駄なので、DBLP_PATH/DBLP_MAX_PAPERSを変えない限り2回目以降はここから読み込む。
-DBLP_CACHE_PATH = "/Users/owner/Downloads/dblp_graph_cache.pkl"
+from dataclasses import dataclass, field
 
-THRESHOLD_COMMON_DEG = 0.25
-TOP_K_SAME_TYPE = 5
-MUTUAL_TOP_K_ONLY = False
 
-DBSCAN_MIN_SAMPLES = 2
-DBSCAN_EPS_SCALE = 1.5
+@dataclass(frozen=True)
+class PathsConfig:
+    data_path: str = "/Users/owner/Downloads/filtered-ml-1m/train.txt"
+    dblp_path: str = "/Users/owner/Downloads/dblp.xml"
+    dblp_dtd_path: str = "/Users/owner/Downloads/dblp.dtd"
+    dblp_max_papers: int = 300_000
+    # load_dblp_graphの結果をキャッシュするpickleファイル。3.8GBのXMLを毎回パースし直すのは
+    # 無駄なので、dblp_path/dblp_max_papersを変えない限り2回目以降はここから読み込む。
+    dblp_cache_path: str = "/Users/owner/Downloads/dblp_graph_cache.pkl"
 
-N_HUB_MOVIES = 3
-N_FOCUS_USERS_PER_HUB = 4
-N_MOVIES_PER_FOCUS_USER = 3
 
+@dataclass(frozen=True)
+class SamplingConfig:
+    n_seed_movies: int = 5
+    n_users_per_movie: int = 20
+    n_movies_per_user: int = 5
+    n_hub_movies: int = 3
+    n_focus_users_per_hub: int = 4
+    n_movies_per_focus_user: int = 3
+
+
+SMALL_SAMPLING = SamplingConfig()
 # --- 大規模サンプリング用パラメータ(userを大幅に増やし、movieと揃える実験用) ---
-LARGE_N_SEED_MOVIES = 15
-LARGE_N_USERS_PER_MOVIE = 60
-LARGE_N_MOVIES_PER_USER = 8
-LARGE_N_HUB_MOVIES = 15
-LARGE_N_FOCUS_USERS_PER_HUB = 5
-LARGE_N_MOVIES_PER_FOCUS_USER = 4
+LARGE_SAMPLING = SamplingConfig(
+    n_seed_movies=15,
+    n_users_per_movie=60,
+    n_movies_per_user=8,
+    n_hub_movies=15,
+    n_focus_users_per_hub=5,
+    n_movies_per_focus_user=4,
+)
 
+
+@dataclass(frozen=True)
+class GraphBuildConfig:
+    threshold_common_deg: float = 0.25
+    top_k_same_type: int = 5
+    mutual_top_k_only: bool = False
+
+
+@dataclass(frozen=True)
+class ClusterConfig:
+    dbscan_min_samples: int = 2
+    dbscan_eps_scale: float = 1.5
+
+
+@dataclass(frozen=True)
+class LayoutConfig:
+    base_cutoff: float = 0.3
+    base_n: int = 32
+    strength: float = 0.3
+    gamma: float = 1.0
+    anchor_weight: float = 1.0
+    maxiter: int = 500
+
+
+@dataclass(frozen=True)
+class ExperimentConfig:
+    paths: PathsConfig = field(default_factory=PathsConfig)
+    graph_build: GraphBuildConfig = field(default_factory=GraphBuildConfig)
+    cluster: ClusterConfig = field(default_factory=ClusterConfig)
+    layout: LayoutConfig = field(default_factory=LayoutConfig)
+    small_sampling: SamplingConfig = field(default_factory=lambda: SMALL_SAMPLING)
+    large_sampling: SamplingConfig = field(default_factory=lambda: LARGE_SAMPLING)
+
+
+DEFAULT_CONFIG = ExperimentConfig()
+
+# 後方互換のためのdictビュー(get_small_subgraph_cached(M, **SMALL_BUILD_KWARGS)のような
+# 呼び出し方をそのまま残せるようにするための橋渡し)。
 SMALL_BUILD_KWARGS = dict(
-    n_hub_movies=N_HUB_MOVIES,
-    n_focus_users_per_hub=N_FOCUS_USERS_PER_HUB,
-    n_movies_per_focus_user=N_MOVIES_PER_FOCUS_USER,
+    n_hub_movies=SMALL_SAMPLING.n_hub_movies,
+    n_focus_users_per_hub=SMALL_SAMPLING.n_focus_users_per_hub,
+    n_movies_per_focus_user=SMALL_SAMPLING.n_movies_per_focus_user,
 )
 
 LARGE_BUILD_KWARGS = dict(
-    n_seed_movies=LARGE_N_SEED_MOVIES,
-    n_users_per_movie=LARGE_N_USERS_PER_MOVIE,
-    n_movies_per_user=LARGE_N_MOVIES_PER_USER,
-    n_hub_movies=LARGE_N_HUB_MOVIES,
-    n_focus_users_per_hub=LARGE_N_FOCUS_USERS_PER_HUB,
-    n_movies_per_focus_user=LARGE_N_MOVIES_PER_FOCUS_USER,
+    n_seed_movies=LARGE_SAMPLING.n_seed_movies,
+    n_users_per_movie=LARGE_SAMPLING.n_users_per_movie,
+    n_movies_per_user=LARGE_SAMPLING.n_movies_per_user,
+    n_hub_movies=LARGE_SAMPLING.n_hub_movies,
+    n_focus_users_per_hub=LARGE_SAMPLING.n_focus_users_per_hub,
+    n_movies_per_focus_user=LARGE_SAMPLING.n_movies_per_focus_user,
 )

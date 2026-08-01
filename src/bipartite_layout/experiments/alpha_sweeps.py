@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
-from bipartite_layout.config import MUTUAL_TOP_K_ONLY, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE
+from bipartite_layout.config import DEFAULT_CONFIG
 from bipartite_layout.diagnostics import (
     analyze_common_neighbor_popularity_bias,
     analyze_degree_and_null_model,
@@ -32,7 +32,7 @@ from bipartite_layout.plotting import plot_and_save
 
 
 def run_full_experiment(M, build_kwargs, label, n_seeds=20,
-                         threshold=THRESHOLD_COMMON_DEG, run_heavy_diagnostics=True):
+                         threshold=DEFAULT_CONFIG.graph_build.threshold_common_deg, run_heavy_diagnostics=True):
     G = get_small_subgraph_cached(M, **build_kwargs)
     n_user_nodes = sum(1 for n in G.nodes() if n.startswith("u_"))
     n_movie_nodes = sum(1 for n in G.nodes() if n.startswith("m_"))
@@ -78,11 +78,11 @@ def run_full_experiment(M, build_kwargs, label, n_seeds=20,
         )
 
     if threshold is None:
-        print("\nTHRESHOLD_COMMON_DEG が未設定です。閾値を決めてから再実行してください。")
+        print("\nthreshold(閾値)が未設定です。閾値を決めてから再実行してください。")
         return
 
     nodes, idx, common_deg, weight, is_user = get_matrices_cached(
-        G, "degree", threshold, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY)
+        G, "degree", threshold, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only)
 
     if run_heavy_diagnostics:
         analyze_virtual_edge_graph_structure(nodes, common_deg, is_user, threshold)
@@ -319,7 +319,7 @@ def run_b_vs_c_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None,
     各種平均値)は並列実行でも完全に同一になる(seedで決まる計算内容自体は変わらないため)。
     """
     nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, weight_mode, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+        G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
@@ -420,7 +420,7 @@ def run_b_c_d_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None, 
     実験結果には一切影響しない。
     """
     nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, weight_mode, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+        G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 

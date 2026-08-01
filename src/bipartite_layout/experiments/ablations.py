@@ -3,7 +3,7 @@
 import numpy as np
 
 from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
-from bipartite_layout.config import LARGE_BUILD_KWARGS, MUTUAL_TOP_K_ONLY, SMALL_BUILD_KWARGS, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE
+from bipartite_layout.config import DEFAULT_CONFIG, LARGE_BUILD_KWARGS, SMALL_BUILD_KWARGS
 from bipartite_layout.diagnostics import run_sampling_parameter_sweep
 from bipartite_layout.experiments.alpha_sweeps import run_full_experiment
 from bipartite_layout.layout_core import compute_layout_method
@@ -25,7 +25,7 @@ def main_repulsion_and_init_ablation(M, dataset_label, alphas=None, gamma=0.1, s
 
     G = get_small_subgraph_cached(M)
     nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, "degree", THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+        G, "degree", DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
@@ -80,7 +80,7 @@ def main_weight_mode_image_comparison(M, dataset_label, weight_modes=("uniform",
 
     for weight_mode in weight_modes:
         nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-            G, weight_mode, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+            G, weight_mode, DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
         )
         print(f"\n--- [{dataset_label}] weight_mode={weight_mode} の画像を生成 ---")
         plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user, alphas,

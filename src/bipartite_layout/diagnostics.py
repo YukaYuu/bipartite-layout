@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from networkx.algorithms.community import louvain_communities, modularity
 
 from bipartite_layout.caching import get_matrices_cached, get_small_subgraph_cached
-from bipartite_layout.config import MUTUAL_TOP_K_ONLY, THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE
+from bipartite_layout.config import DEFAULT_CONFIG
 
 
 def inspect_common_deg_distribution(G, save_path="common_deg_distribution.png"):
@@ -106,9 +106,9 @@ def inspect_common_deg_distribution_by_type(G, save_path="common_deg_distributio
             print(f"  分位点: min={values.min():.3f}, 25%={np.percentile(values,25):.3f}, "
                   f"50%={np.percentile(values,50):.3f}, 75%={np.percentile(values,75):.3f}, "
                   f"max={values.max():.3f}")
-            n_over_th = int(np.sum(values >= THRESHOLD_COMMON_DEG)) if THRESHOLD_COMMON_DEG is not None else None
+            n_over_th = int(np.sum(values >= DEFAULT_CONFIG.graph_build.threshold_common_deg)) if DEFAULT_CONFIG.graph_build.threshold_common_deg is not None else None
             if n_over_th is not None:
-                print(f"  閾値{THRESHOLD_COMMON_DEG}以上のペア数: {n_over_th} "
+                print(f"  閾値{DEFAULT_CONFIG.graph_build.threshold_common_deg}以上のペア数: {n_over_th} "
                       f"({100 * n_over_th / total_pairs:.1f}% of 全同種ペア)")
 
     n_user_pairs = len(user_nodes) * (len(user_nodes) - 1) // 2
@@ -121,14 +121,14 @@ def inspect_common_deg_distribution_by_type(G, save_path="common_deg_distributio
     ax1.set_title(f"user-user (n={len(user_nodes)})")
     ax1.set_xlabel("common_deg (> 0 only)")
     ax1.set_ylabel("pair count")
-    if THRESHOLD_COMMON_DEG is not None:
-        ax1.axvline(THRESHOLD_COMMON_DEG, color="black", linestyle="--", linewidth=1)
+    if DEFAULT_CONFIG.graph_build.threshold_common_deg is not None:
+        ax1.axvline(DEFAULT_CONFIG.graph_build.threshold_common_deg, color="black", linestyle="--", linewidth=1)
 
     ax2.hist(movie_values, bins=20, color="tab:red")
     ax2.set_title(f"movie-movie (n={len(movie_nodes)})")
     ax2.set_xlabel("common_deg (> 0 only)")
-    if THRESHOLD_COMMON_DEG is not None:
-        ax2.axvline(THRESHOLD_COMMON_DEG, color="black", linestyle="--", linewidth=1)
+    if DEFAULT_CONFIG.graph_build.threshold_common_deg is not None:
+        ax2.axvline(DEFAULT_CONFIG.graph_build.threshold_common_deg, color="black", linestyle="--", linewidth=1)
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
@@ -194,7 +194,7 @@ def compute_null_model_ratio(G):
     return ratio_user, ratio_movie
 
 
-def run_sampling_parameter_sweep(M, configs, threshold=THRESHOLD_COMMON_DEG):
+def run_sampling_parameter_sweep(M, configs, threshold=DEFAULT_CONFIG.graph_build.threshold_common_deg):
     print(f"\n{'config':>48} | {'n_u':>4} | {'n_m':>4} | {'mod(u)':>7} | {'mod(m)':>7} | "
           f"{'ratio(u)':>9} | {'ratio(m)':>9} | {'CV(u)':>7} | {'CV(m)':>7}")
     print("-" * 122)
@@ -206,7 +206,7 @@ def run_sampling_parameter_sweep(M, configs, threshold=THRESHOLD_COMMON_DEG):
         n_movie = sum(1 for n in G.nodes() if n.startswith("m_"))
 
         nodes, idx, common_deg, weight, is_user = get_matrices_cached(
-            G, "degree", threshold, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+            G, "degree", threshold, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
         )
         mod_user, mod_movie = analyze_virtual_edge_graph_structure_quiet(
             nodes, common_deg, is_user, threshold

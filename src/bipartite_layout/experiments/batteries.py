@@ -3,14 +3,7 @@
 import numpy as np
 
 from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
-from bipartite_layout.config import (
-    DATA_PATH,
-    LARGE_BUILD_KWARGS,
-    MUTUAL_TOP_K_ONLY,
-    SMALL_BUILD_KWARGS,
-    THRESHOLD_COMMON_DEG,
-    TOP_K_SAME_TYPE,
-)
+from bipartite_layout.config import DEFAULT_CONFIG, LARGE_BUILD_KWARGS, SMALL_BUILD_KWARGS
 from bipartite_layout.data.dblp import load_dblp_graph_cached
 from bipartite_layout.data.movielens import load_movielens_graph
 from bipartite_layout.experiments.ablations import (
@@ -131,14 +124,14 @@ def main_beta_transform_comparison(M, dataset_label, weight_mode="uniform", n_se
     return result_raw, result_beta
 
 
-def compute_split_nmi_for_config(M, build_kwargs, label, threshold=THRESHOLD_COMMON_DEG):
+def compute_split_nmi_for_config(M, build_kwargs, label, threshold=DEFAULT_CONFIG.graph_build.threshold_common_deg):
     G = get_small_subgraph_cached(M, **build_kwargs)
     n_user = sum(1 for n in G.nodes() if n.startswith("u_"))
     n_movie = sum(1 for n in G.nodes() if n.startswith("m_"))
     print(f"\n{'=' * 20} [{label}] 分割NMIチェック (n_user={n_user}, n_movie={n_movie}) {'=' * 20}")
 
     nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, "uniform", threshold, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+        G, "uniform", threshold, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
@@ -178,7 +171,7 @@ def main_alpha_grid_plot(M, dataset_label):
 
     G = get_small_subgraph_cached(M)
     nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
-        G, "degree", THRESHOLD_COMMON_DEG, TOP_K_SAME_TYPE, MUTUAL_TOP_K_ONLY
+        G, "degree", DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
 
     alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)  # 21点
@@ -212,7 +205,7 @@ def main_compare_movielens_and_dblp():
     MovieLensとDBLPに対して全く同じ実験一式(run_all_experiments_for_dataset)を実行し、
     両者の結果を出力ファイル名(dataset_label付き)で見比べられるようにする。
     """
-    M_movielens = load_movielens_graph(DATA_PATH)
+    M_movielens = load_movielens_graph(DEFAULT_CONFIG.paths.data_path)
     run_all_experiments_for_dataset(M_movielens, "movielens")
 
     M_dblp = load_dblp_graph_cached()

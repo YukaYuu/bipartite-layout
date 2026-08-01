@@ -6,7 +6,7 @@ import pickle
 import networkx as nx
 from lxml import etree
 
-from bipartite_layout.config import DBLP_CACHE_PATH, DBLP_DTD_PATH, DBLP_MAX_PAPERS, DBLP_PATH
+from bipartite_layout.config import DEFAULT_CONFIG
 
 
 class _FixedPathResolver(etree.Resolver):
@@ -75,8 +75,9 @@ def load_dblp_graph(path, max_papers=None, dtd_path=None):
     return G
 
 
-def load_dblp_graph_cached(path=DBLP_PATH, max_papers=DBLP_MAX_PAPERS, dtd_path=DBLP_DTD_PATH,
-                            cache_path=DBLP_CACHE_PATH):
+def load_dblp_graph_cached(path=DEFAULT_CONFIG.paths.dblp_path, max_papers=DEFAULT_CONFIG.paths.dblp_max_papers,
+                            dtd_path=DEFAULT_CONFIG.paths.dblp_dtd_path,
+                            cache_path=DEFAULT_CONFIG.paths.dblp_cache_path):
     """
     load_dblp_graphの結果をpickleでキャッシュするラッパー。3.8GBのXMLをiterparseで
     パースするのはmax_papers=300,000でも数分かかるが、build_small_subgraphが最終的に

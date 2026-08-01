@@ -8,7 +8,7 @@ from networkx.algorithms.community import louvain_communities
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics import normalized_mutual_info_score
 
-from bipartite_layout.config import DBSCAN_EPS_SCALE, DBSCAN_MIN_SAMPLES
+from bipartite_layout.config import DEFAULT_CONFIG
 
 
 def compute_separation_metrics(coords, is_user):
@@ -37,7 +37,8 @@ def compute_separation_metrics(coords, is_user):
     return centroid_separation, nn_ratio
 
 
-def compute_cluster_metrics(coords, mask, min_samples=DBSCAN_MIN_SAMPLES, eps_scale=DBSCAN_EPS_SCALE):
+def compute_cluster_metrics(coords, mask, min_samples=DEFAULT_CONFIG.cluster.dbscan_min_samples,
+                             eps_scale=DEFAULT_CONFIG.cluster.dbscan_eps_scale):
     subset = coords[mask]
     n = len(subset)
     if n <= min_samples:

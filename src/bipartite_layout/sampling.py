@@ -3,7 +3,7 @@
 import numpy as np
 from networkx.algorithms.community import louvain_communities
 
-from bipartite_layout.config import N_FOCUS_USERS_PER_HUB, N_HUB_MOVIES, N_MOVIES_PER_FOCUS_USER
+from bipartite_layout.config import DEFAULT_CONFIG
 
 
 def select_hub_movies_by_community(subgraph, n_hub_movies):
@@ -40,9 +40,9 @@ def select_hub_movies_by_community(subgraph, n_hub_movies):
 
 
 def build_small_subgraph(M, n_seed_movies=5, n_users_per_movie=20,
-                          n_movies_per_user=5, n_hub_movies=N_HUB_MOVIES,
-                          n_focus_users_per_hub=N_FOCUS_USERS_PER_HUB,
-                          n_movies_per_focus_user=N_MOVIES_PER_FOCUS_USER):
+                          n_movies_per_user=5, n_hub_movies=DEFAULT_CONFIG.small_sampling.n_hub_movies,
+                          n_focus_users_per_hub=DEFAULT_CONFIG.small_sampling.n_focus_users_per_hub,
+                          n_movies_per_focus_user=DEFAULT_CONFIG.small_sampling.n_movies_per_focus_user):
     movie_nodes = [n for n in M.nodes() if n.startswith("m_")]
     movie_degrees = sorted(movie_nodes, key=lambda n: M.degree(n), reverse=True)
 
