@@ -5,6 +5,7 @@ import numpy as np
 from bipartite_layout.caching import get_edge_direction_cached, get_matrices_cached, get_small_subgraph_cached
 from bipartite_layout.config import DEFAULT_CONFIG, LARGE_BUILD_KWARGS, SMALL_BUILD_KWARGS
 from bipartite_layout.diagnostics import run_sampling_parameter_sweep
+from bipartite_layout.experiment_context import default_alpha_grid
 from bipartite_layout.experiments.alpha_sweeps import run_full_experiment
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.metrics import compute_nn_distance_cv
@@ -30,7 +31,7 @@ def main_repulsion_and_init_ablation(M, dataset_label, alphas=None, gamma=0.1, s
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
     if alphas is None:
-        alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)
+        alphas = default_alpha_grid()
 
     repulsion_configs = [
         ("通常(全ペア反発)", {}),
@@ -76,7 +77,7 @@ def main_weight_mode_image_comparison(M, dataset_label, weight_modes=("uniform",
 
     G = get_small_subgraph_cached(M)
     if alphas is None:
-        alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)
+        alphas = default_alpha_grid()
 
     for weight_mode in weight_modes:
         nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(

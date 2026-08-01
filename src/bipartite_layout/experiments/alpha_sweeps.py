@@ -23,7 +23,7 @@ from bipartite_layout.direction import (
     cluster_edges_by_community,
     precompute_direction_pairs,
 )
-from bipartite_layout.experiment_context import save_figure
+from bipartite_layout.experiment_context import default_alpha_grid, save_figure
 from bipartite_layout.experiments.workers import _bc_seed_worker, _bcd_seed_worker
 from bipartite_layout.layout_core import compute_layout_method
 from bipartite_layout.layout_workers import compute_layout_multi_seed
@@ -321,7 +321,7 @@ def run_b_vs_c_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None,
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
     if alphas is None:
-        alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)
+        alphas = default_alpha_grid()
 
     print(f"\n{'-' * 15} [{dataset_label}] B vs C alphaスイープ (weight_mode={weight_mode}) {'-' * 15}")
     print(f"{'alpha':>6} | {'B conv':>8} | {'C conv':>8} | {'B dir(conv)':>12} | {'C dir(conv)':>12} | {'B nn(conv)':>11} | {'C nn(conv)':>11}")
@@ -422,7 +422,7 @@ def run_b_c_d_alpha_sweep(G, dataset_label, weight_mode="uniform", alphas=None, 
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
     if alphas is None:
-        alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)
+        alphas = default_alpha_grid()
 
     print(f"\n{'-' * 15} [{dataset_label}] B/C/D alphaスイープ "
           f"(weight_mode={weight_mode}, anchor_weight={anchor_weight}) {'-' * 15}")

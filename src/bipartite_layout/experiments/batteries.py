@@ -11,6 +11,7 @@ from bipartite_layout.experiments.ablations import (
     main_repulsion_and_init_ablation,
     main_weight_mode_image_comparison,
 )
+from bipartite_layout.experiment_context import default_alpha_grid
 from bipartite_layout.experiments.alpha_sweeps import beta_transform, run_b_vs_c_alpha_sweep
 from bipartite_layout.metrics import compute_split_nmi
 from bipartite_layout.plotting import plot_alpha_grid
@@ -174,7 +175,7 @@ def main_alpha_grid_plot(M, dataset_label):
         G, "degree", DEFAULT_CONFIG.graph_build.threshold_common_deg, DEFAULT_CONFIG.graph_build.top_k_same_type, DEFAULT_CONFIG.graph_build.mutual_top_k_only
     )
 
-    alphas = np.round(np.arange(0.0, 1.01, 0.05), 2)  # 21点
+    alphas = default_alpha_grid()  # 21点
     plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user, alphas,
                      gamma=0.1, seed=0, filename=f"alpha_grid_{dataset_label}.png")
 

@@ -1,6 +1,18 @@
 """Shared helpers used across experiment drivers (dedup target)."""
 
 import matplotlib.pyplot as plt
+import numpy as np
+
+
+def default_alpha_grid(step=0.05):
+    """
+    21点(既定step=0.05でalpha=0.00〜1.00)の標準alphaグリッド。複数のalphaスイープ系
+    関数(run_b_vs_c_alpha_sweep, run_b_c_d_alpha_sweep, main_repulsion_and_init_ablation,
+    main_weight_mode_image_comparison, main_alpha_grid_plot)で"alphas is None"の
+    フォールバックとして同一のnp.round(np.arange(0.0, 1.01, 0.05), 2)が重複していたのを
+    共通化したもの。
+    """
+    return np.round(np.arange(0.0, 1.01, step), 2)
 
 
 def save_figure(fig, path, dpi=150, message=None):
