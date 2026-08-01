@@ -8,6 +8,16 @@ from bipartite_layout.experiment_context import save_figure
 from bipartite_layout.layout_core import compute_layout_method
 
 
+def _chunk_alphas(alphas, max_cols=7):
+    """
+    alphasをmax_cols列ずつのチャンクに分割するジェネレータ(chunk_idx, chunk_alphas)。
+    plot_alpha_grid/plot_ablation_gridで重複していたチャンク分割ロジックの共通化。
+    """
+    n_chunks = int(np.ceil(len(alphas) / max_cols))
+    for chunk_idx in range(n_chunks):
+        yield chunk_idx, alphas[chunk_idx * max_cols: (chunk_idx + 1) * max_cols]
+
+
 def plot_and_save(coords, is_user, G, node_idx, title, filename, edge_labels=None):
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(coords[is_user, 0], coords[is_user, 1], c="black", marker="s", label="user", s=40, zorder=3)
@@ -40,13 +50,9 @@ def plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user,
     """
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
-    n_alphas = len(alphas)
-    max_cols_per_row = 7  # 1行あたり最大7列(alpha)に折り返す
-    n_chunks = int(np.ceil(n_alphas / max_cols_per_row))
     n_rows = len(methods)
 
-    for chunk_idx in range(n_chunks):
-        chunk_alphas = alphas[chunk_idx * max_cols_per_row: (chunk_idx + 1) * max_cols_per_row]
+    for chunk_idx, chunk_alphas in _chunk_alphas(alphas):
         n_cols = len(chunk_alphas)
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.8 * n_cols, 2.8 * n_rows))
@@ -103,13 +109,9 @@ def plot_ablation_grid(G, common_deg, weight, nodes, node_idx, is_user,
     """
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
-    n_alphas = len(alphas)
-    max_cols_per_row = 7  # 1行あたり最大7列(alpha)に折り返す
-    n_chunks = int(np.ceil(n_alphas / max_cols_per_row))
     n_rows = len(configs)
 
-    for chunk_idx in range(n_chunks):
-        chunk_alphas = alphas[chunk_idx * max_cols_per_row: (chunk_idx + 1) * max_cols_per_row]
+    for chunk_idx, chunk_alphas in _chunk_alphas(alphas):
         n_cols = len(chunk_alphas)
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.8 * n_cols, 2.8 * n_rows))
