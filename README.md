@@ -24,6 +24,22 @@ lightweight post-process — trading a small amount of alignment quality for
 much better convergence stability than jointly optimizing both objectives
 at once (method C).
 
+## Results
+
+Real MovieLens data, same seed and alpha across all three methods. Method D's
+edges visibly bundle toward shared directions within each cluster:
+
+![Method B/C/D comparison](docs/images/method_comparison.png)
+
+Node placement at extreme alpha values can look lattice-like — this turned out
+to be a real, testable hypothesis rather than a visual coincidence: with
+same-type attraction sparsified to top-k neighbors, most node pairs feel only
+mutual repulsion, and disabling that repulsion for same-type pairs removes the
+lattice pattern entirely (`tests/test_layout_core.py::test_repel_same_type_changes_layout`
+locks in that this flag has a real effect, not a silently-ignored one):
+
+![Repulsion ablation](docs/images/repulsion_ablation.png)
+
 ## Package layout
 
 ```

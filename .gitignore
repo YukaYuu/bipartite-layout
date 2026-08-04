@@ -4,6 +4,7 @@ __pycache__/
 venv/
 outputs/
 *.png
+!docs/images/*.png
 *.pkl
 .DS_Store
 *.egg-info/
