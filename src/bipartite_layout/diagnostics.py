@@ -4,10 +4,12 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 from networkx.algorithms.community import louvain_communities, modularity
+from scipy.optimize import minimize
 
 from bipartite_layout.caching import get_matrices_cached, get_small_subgraph_cached
 from bipartite_layout.config import DEFAULT_CONFIG
 from bipartite_layout.experiment_context import save_figure
+from bipartite_layout.layout_core import make_initial_positions, stress_and_grad
 
 
 def inspect_common_deg_distribution(G, save_path="common_deg_distribution.png"):
@@ -452,3 +454,134 @@ def analyze_virtual_edge_graph_structure_quiet(nodes, common_deg, is_user, thres
     mod_user = build_subgraph_and_modularity(is_user)
     mod_movie = build_subgraph_and_modularity(~is_user)
     return mod_user, mod_movie
+
+
+def check_alpha_term_balance(M, sampling_kwargs=None, weight_mode="degree",
+                              threshold_common_deg=DEFAULT_CONFIG.graph_build.threshold_common_deg,
+                              top_k_same_type=DEFAULT_CONFIG.graph_build.top_k_same_type,
+                              alphas=None, n_seeds=3, save_path="alpha_term_balance.png"):
+    """
+    実エッジ(weight, cross-type)と仮想エッジ(common_deg, same-type)の力の大きさが
+    釣り合っているかを検証する(先生からのご指摘への対応)。combined_stress_and_grad
+    は total_stress = alpha*s_a(仮想) + (1-alpha)*s_b(実) で2項を混合しているが、
+    matrices.pyではweightだけが[0.4, 1.0]に正規化されており、common_degには
+    対応する正規化が無い(build_matrices内のコメント参照)。この非対称な設計が、
+    「0<alpha<(1-epsilon)ではレイアウトがほとんど変わらず、alpha≒1で突然大きく
+    変わる」という病的な挙動を引き起こしていないかを、以下の3つの観点で確認する:
+
+    1. 生の(alpha重み付け前の)項の大きさ s_a, s_b の比較
+    2. alpha刻みごとのレイアウトの実際の移動量(病的な挙動があれば、
+       alpha≒1の直前だけ移動量が跳ね上がるはず)
+    3. 収束後の勾配ノルム ||alpha*g_a|| と ||(1-alpha)*g_b|| の比較。
+       alphaと(1-alpha)という「係数」が対称であることと、実際に各項が
+       最適化に与える「力」が釣り合っていることは別物である(係数バランス
+       vs 力バランス)。total_stressの勾配は収束時に0に近づくが、これは
+       alpha*g_a と (1-alpha)*g_b が個別に小さいからではなく、反発力も
+       含めて互いに打ち消し合っているだけの可能性があるため、s_aとs_bの
+       比較(観点1)だけでは見えない非対称性をここで確認する。
+    """
+    if sampling_kwargs is None:
+        sampling_kwargs = {}
+    if alphas is None:
+        alphas = [0.0, 0.1, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0]
+
+    G = get_small_subgraph_cached(M, **sampling_kwargs)
+    nodes, node_idx, common_deg, weight, is_user = get_matrices_cached(
+        G, weight_mode, threshold_common_deg, top_k_same_type
+    )
+
+    nz_common = common_deg[common_deg > 0]
+    nz_weight = weight[weight > 0]
+    print(f"仮想エッジ(common_deg) 非ゼロ範囲: [{nz_common.min():.4f}, {nz_common.max():.4f}], "
+          f"平均={nz_common.mean():.4f}, 本数={int(np.sum(common_deg > 0) / 2)}")
+    print(f"実エッジ(weight)      非ゼロ範囲: [{nz_weight.min():.4f}, {nz_weight.max():.4f}], "
+          f"平均={nz_weight.mean():.4f}, 本数={int(np.sum(weight > 0) / 2)}")
+
+    def raw_terms_at(coords_flat):
+        """stress_and_gradをalpha=1(仮想のみ)とalpha=0(実のみ)で個別に呼び、
+        alpha重み付け前の生の項の大きさ・勾配 (s_a, g_a), (s_b, g_b) を取り出す。"""
+        s_a, g_a = stress_and_grad(coords_flat, common_deg, weight, 1.0, 0.0, 0.0, is_user, True)
+        s_b, g_b = stress_and_grad(coords_flat, common_deg, weight, 0.0, 0.0, 0.0, is_user, True)
+        return s_a, g_a, s_b, g_b
+
+    print(f"\n--- ランダム初期配置{n_seeds}通りでの生の項の大きさ ---")
+    init_ratios = []
+    for seed in range(n_seeds):
+        coords = make_initial_positions(nodes, is_user, alpha=0.5, seed=seed)
+        s_a, _, s_b, _ = raw_terms_at(coords)
+        ratio = s_b / s_a if s_a > 0 else float("inf")
+        init_ratios.append(ratio)
+        print(f"  seed={seed}: s_a(仮想)={s_a:.4f}  s_b(実)={s_b:.4f}  s_b/s_a={ratio:.2f}")
+
+    print(f"\n--- alpha刻みごとの収束レイアウト: 項の大きさ・力バランス・移動量 "
+          f"({n_seeds}シードの平均) ---")
+    movements_by_alpha = {a: [] for a in alphas[1:]}
+    s_a_by_alpha = {a: [] for a in alphas}
+    s_b_by_alpha = {a: [] for a in alphas}
+    force_ratio_by_alpha = {a: [] for a in alphas}
+    for seed in range(n_seeds):
+        prev_coords = None
+        for a in alphas:
+            x0 = make_initial_positions(nodes, is_user, a, seed=seed)
+            result = minimize(
+                stress_and_grad, x0, args=(common_deg, weight, a, 0.3, 0.3, is_user, True),
+                jac=True, method="L-BFGS-B", options={"maxiter": 500},
+            )
+            coords = result.x
+            s_a, g_a, s_b, g_b = raw_terms_at(coords)
+            s_a_by_alpha[a].append(s_a)
+            s_b_by_alpha[a].append(s_b)
+            # 係数バランス(alpha, 1-alpha)ではなく、収束後にそれぞれの項が
+            # 実際にどれだけ強く配置を引っ張ろうとしていたか(力バランス)を見る。
+            # alpha=0, 1では定義上どちらかが0になるだけの自明なケースなので除外。
+            if 0.0 < a < 1.0:
+                virtual_force = np.linalg.norm(a * g_a)
+                real_force = np.linalg.norm((1 - a) * g_b)
+                force_ratio_by_alpha[a].append(virtual_force / (real_force + 1e-12))
+            if prev_coords is not None:
+                movements_by_alpha[a].append(np.linalg.norm(coords - prev_coords) / np.linalg.norm(prev_coords))
+            prev_coords = coords
+
+    mean_s_a = [np.mean(s_a_by_alpha[a]) for a in alphas]
+    mean_s_b = [np.mean(s_b_by_alpha[a]) for a in alphas]
+    mean_movement = [np.mean(movements_by_alpha[a]) for a in alphas[1:]]
+    force_alphas = [a for a in alphas if 0.0 < a < 1.0]
+    mean_force_ratio = [np.mean(force_ratio_by_alpha[a]) for a in force_alphas]
+
+    for a, ma, mb in zip(alphas, mean_s_a, mean_s_b):
+        mv = np.mean(movements_by_alpha[a]) if a in movements_by_alpha and movements_by_alpha[a] else float("nan")
+        fr = np.mean(force_ratio_by_alpha[a]) if force_ratio_by_alpha.get(a) else float("nan")
+        print(f"  alpha={a:.2f}: s_a(仮想)={ma:8.4f} s_b(実)={mb:8.4f} "
+              f"力比||a*g_a||/||(1-a)*g_b||={fr:6.4f} 直前alphaからの相対移動量={mv:.4f}")
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 4))
+    ax1.plot(alphas, mean_s_a, marker="o", label="s_a (virtual, unweighted)")
+    ax1.plot(alphas, mean_s_b, marker="o", label="s_b (real, unweighted)")
+    ax1.set_xlabel("alpha")
+    ax1.set_ylabel("raw stress term (before alpha weighting)")
+    ax1.legend()
+    ax1.set_title("Raw term magnitude vs alpha")
+
+    ax2.plot(alphas[1:], mean_movement, marker="o", color="tab:red")
+    ax2.set_xlabel("alpha")
+    ax2.set_ylabel("relative movement from previous alpha")
+    ax2.set_title("Layout movement across the alpha sweep\n(a spike only near alpha=1 would indicate the failure mode)")
+
+    ax3.plot(force_alphas, mean_force_ratio, marker="o", color="tab:green")
+    ax3.axhline(1.0, color="gray", linestyle="--", linewidth=1, label="balanced (ratio=1)")
+    ax3.set_xlabel("alpha")
+    ax3.set_ylabel("||alpha*g_a|| / ||(1-alpha)*g_b||")
+    ax3.set_title("Force balance at convergence\n(coefficient alpha != actual force balance)")
+    ax3.legend()
+
+    save_figure(fig, save_path, message=f"\n保存しました: {save_path}")
+
+    return {
+        "alphas": alphas,
+        "mean_s_a": mean_s_a,
+        "mean_s_b": mean_s_b,
+        "mean_movement": mean_movement,
+        "force_alphas": force_alphas,
+        "mean_force_ratio": mean_force_ratio,
+        "init_ratios": init_ratios,
+    }
