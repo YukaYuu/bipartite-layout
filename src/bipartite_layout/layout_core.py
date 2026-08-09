@@ -41,8 +41,14 @@ def make_initial_positions_random(nodes, seed=0):
     return coords.flatten()
 
 
-def _stress_and_grad_numpy(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user, repel_same_type):
-    """stress_and_gradのnumpyベクトル化実装。numbaが使えない環境向けのフォールバック。"""
+def _stress_and_grad_numpy(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user, repel_same_type,
+                            real_edge_epsilon=0.0):
+    """stress_and_gradのnumpyベクトル化実装。numbaが使えない環境向けのフォールバック。
+
+    real_edge_epsilon: 実エッジ項の係数を(1-alpha)ではなく(1-alpha+real_edge_epsilon)にする
+    (先生からのご指摘への対応: alpha=1.0でも実エッジ制約を完全には消さない)。
+    デフォルト0.0は既存の(1-alpha)と完全に同じ。
+    """
     N = common_deg.shape[0]
     coords = coords_flat.reshape(N, 2)
     diff = coords[:, None, :] - coords[None, :, :]
@@ -66,8 +72,9 @@ def _stress_and_grad_numpy(coords_flat, common_deg, weight, alpha, cutoff, stren
 
     cross_type_target = 1 - weight
     s_b, g_b = accumulate(weight > 0, cross_type_target)
-    total_stress += (1 - alpha) * s_b
-    grad += (1 - alpha) * g_b
+    real_edge_coef = (1 - alpha) + real_edge_epsilon
+    total_stress += real_edge_coef * s_b
+    grad += real_edge_coef * g_b
 
     # 反発力は全ペアに適用する(has_attractionによる除外は撤回済み)。
     # ただしrepel_same_type=Falseの場合は、同タイプ同士(user-user/movie-movie)の
@@ -93,7 +100,8 @@ def _stress_and_grad_numpy(coords_flat, common_deg, weight, alpha, cutoff, stren
     return total_stress, grad.flatten()
 
 
-def _stress_and_grad_loop(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user, repel_same_type):
+def _stress_and_grad_loop(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user, repel_same_type,
+                           real_edge_epsilon=0.0):
     """
     stress_and_gradの明示ループ実装。_stress_and_grad_numpyと数値的に等価
     (浮動小数点の加算順序の違いによる1e-8程度の誤差はある)だが、numbaで
@@ -104,6 +112,10 @@ def _stress_and_grad_loop(coords_flat, common_deg, weight, alpha, cutoff, streng
 
     repel_same_type=Falseの場合、同タイプ同士(user-user/movie-movie)の反発だけを
     切る(異タイプ間の反発は残す)。格子状配置が全ペア反発由来かどうかの検証用。
+
+    real_edge_epsilon: 実エッジ項の係数を(1-alpha)ではなく(1-alpha+real_edge_epsilon)にする
+    (先生からのご指摘への対応: alpha=1.0でも実エッジ制約を完全には消さない)。
+    デフォルト0.0は既存の(1-alpha)と完全に同じ。
     """
     N = common_deg.shape[0]
     coords = coords_flat.reshape(N, 2)
@@ -131,8 +143,9 @@ def _stress_and_grad_loop(coords_flat, common_deg, weight, alpha, cutoff, streng
             if w > 0:
                 target = 1.0 - w
                 err = dist - target
-                total_stress += (1.0 - alpha) * err * err
-                coef = (1.0 - alpha) * 2.0 * err / dist
+                real_edge_coef = (1.0 - alpha) + real_edge_epsilon
+                total_stress += real_edge_coef * err * err
+                coef = real_edge_coef * 2.0 * err / dist
                 grad[i, 0] += coef * dx
                 grad[i, 1] += coef * dy
 
@@ -159,8 +172,10 @@ else:
 
 
 def combined_stress_and_grad(coords_flat, common_deg, weight, alpha, nodes, node_idx,
-                              direction_precomputed, gamma, cutoff, strength, is_user, repel_same_type=True):
-    stress_mix, grad_mix = stress_and_grad(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user, repel_same_type)
+                              direction_precomputed, gamma, cutoff, strength, is_user, repel_same_type=True,
+                              real_edge_epsilon=0.0):
+    stress_mix, grad_mix = stress_and_grad(coords_flat, common_deg, weight, alpha, cutoff, strength, is_user,
+                                            repel_same_type, real_edge_epsilon)
     if gamma > 0:
         stress_dir, grad_dir = direction_alignment_stress_and_grad(coords_flat, nodes, node_idx, direction_precomputed)
         return stress_mix + gamma * stress_dir, grad_mix + gamma * grad_dir
@@ -192,7 +207,7 @@ def _postprocess_bundle_stress_and_grad(coords_flat, anchor_flat, anchor_weight,
 def compute_layout_method(method, common_deg, weight, alpha, nodes, node_idx, is_user,
                            direction_precomputed, seed=0, base_cutoff=0.3, base_n=32,
                            strength=0.3, gamma=1.0, maxiter=500, anchor_weight=1.0,
-                           repel_same_type=True, random_init=False):
+                           repel_same_type=True, random_init=False, real_edge_epsilon=0.0):
     """
     method="A": 方向整列のみ(alpha混合なし)
     method="B": alpha混合のみ(gamma=0固定、方向整列なし)
@@ -210,6 +225,10 @@ def compute_layout_method(method, common_deg, weight, alpha, nodes, node_idx, is
     一切アクセスしないため、Noneを渡しても安全)。
 
     cutoffのみをNでスケールする。strengthは常に固定値のまま。
+
+    real_edge_epsilon: 実エッジ項の係数を(1-alpha)ではなく(1-alpha+real_edge_epsilon)にする
+    (先生からのご指摘への対応: alpha=1.0でも実エッジ制約を完全には消さない)。
+    デフォルト0.0は既存の(1-alpha)と完全に同じ挙動。
     """
     N = len(nodes)
     cutoff = base_cutoff * np.sqrt(base_n / N)
@@ -219,7 +238,8 @@ def compute_layout_method(method, common_deg, weight, alpha, nodes, node_idx, is
         coords_b, _, converged_b, _, _ = compute_layout_method(
             "B", common_deg, weight, alpha, nodes, node_idx, is_user, None,
             seed=seed, base_cutoff=base_cutoff, base_n=base_n, strength=strength,
-            gamma=0.0, maxiter=maxiter, repel_same_type=repel_same_type, random_init=random_init
+            gamma=0.0, maxiter=maxiter, repel_same_type=repel_same_type, random_init=random_init,
+            real_edge_epsilon=real_edge_epsilon
         )
         anchor_flat = coords_b.flatten()
         # stage2: そのレイアウトをアンカーしつつ、方向整列のみを追加で最適化する
@@ -240,12 +260,12 @@ def compute_layout_method(method, common_deg, weight, alpha, nodes, node_idx, is
     if method == "A":
         dummy_common_deg = np.zeros_like(weight)
         result = minimize(combined_stress_and_grad, x0,
-                           args=(dummy_common_deg, weight, 0.0, nodes, node_idx, direction_precomputed, gamma, cutoff, strength, is_user, repel_same_type),
+                           args=(dummy_common_deg, weight, 0.0, nodes, node_idx, direction_precomputed, gamma, cutoff, strength, is_user, repel_same_type, real_edge_epsilon),
                            jac=True, method="L-BFGS-B", options={"maxiter": maxiter})
     else:
         g = 0.0 if method == "B" else gamma
         result = minimize(combined_stress_and_grad, x0,
-                           args=(common_deg, weight, alpha, nodes, node_idx, direction_precomputed, g, cutoff, strength, is_user, repel_same_type),
+                           args=(common_deg, weight, alpha, nodes, node_idx, direction_precomputed, g, cutoff, strength, is_user, repel_same_type, real_edge_epsilon),
                            jac=True, method="L-BFGS-B", options={"maxiter": maxiter})
 
     grad_norm = np.linalg.norm(result.jac)

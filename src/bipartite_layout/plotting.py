@@ -43,10 +43,13 @@ def plot_and_save(coords, is_user, G, node_idx, title, filename, edge_labels=Non
 
 def plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user,
                      alphas, gamma=0.1, seed=0, filename="alpha_grid.png",
-                     methods=("B", "C"), anchor_weight=1.0):
+                     methods=("B", "C"), anchor_weight=1.0, real_edge_epsilon=0.0):
     """
     行=methods(既定ではB, C。methods=("B","C","D")のようにDも含められる)、
     列=alphaの値、というグリッドでレイアウトを一覧表示する。
+
+    real_edge_epsilon: 実エッジ項の係数を(1-alpha)ではなく(1-alpha+real_edge_epsilon)
+    にする(先生からのご指摘への対応)。デフォルト0.0は既存挙動と同じ。
     """
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(G, node_idx)
 
@@ -65,7 +68,8 @@ def plot_alpha_grid(G, common_deg, weight, nodes, node_idx, is_user,
             method_results = [
                 (label,) + compute_layout_method(
                     label, common_deg, weight, alpha, nodes, node_idx, is_user,
-                    direction_precomputed, seed=seed, gamma=gamma, anchor_weight=anchor_weight
+                    direction_precomputed, seed=seed, gamma=gamma, anchor_weight=anchor_weight,
+                    real_edge_epsilon=real_edge_epsilon
                 )
                 for label in methods
             ]

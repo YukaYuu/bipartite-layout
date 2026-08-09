@@ -66,6 +66,10 @@ class LayoutConfig:
     gamma: float = 1.0
     anchor_weight: float = 1.0
     maxiter: int = 500
+    # 実エッジ項の係数を(1-alpha)ではなく(1-alpha+real_edge_epsilon)にすることで、
+    # alpha=1.0でも実エッジ制約を完全には消さない(先生からのご指摘への対応)。
+    # デフォルト0.0は既存の(1-alpha)と完全に同じ挙動を保つ(後方互換)。
+    real_edge_epsilon: float = 0.0
 
 
 @dataclass(frozen=True)

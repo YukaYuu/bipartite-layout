@@ -19,14 +19,54 @@ def test_numba_and_numpy_stress_and_grad_agree(matrices):
     cutoff, strength = 0.3, 0.3
 
     for repel_same_type in (True, False):
-        stress_loop, grad_loop = layout_core._stress_and_grad_loop(
-            coords_flat, common_deg, weight, 0.5, cutoff, strength, is_user, repel_same_type
-        )
-        stress_np, grad_np = layout_core._stress_and_grad_numpy(
-            coords_flat, common_deg, weight, 0.5, cutoff, strength, is_user, repel_same_type
-        )
-        assert np.isclose(stress_loop, stress_np, rtol=1e-6)
-        assert np.allclose(grad_loop, grad_np, atol=1e-8)
+        for real_edge_epsilon in (0.0, 0.05):
+            stress_loop, grad_loop = layout_core._stress_and_grad_loop(
+                coords_flat, common_deg, weight, 0.5, cutoff, strength, is_user, repel_same_type,
+                real_edge_epsilon
+            )
+            stress_np, grad_np = layout_core._stress_and_grad_numpy(
+                coords_flat, common_deg, weight, 0.5, cutoff, strength, is_user, repel_same_type,
+                real_edge_epsilon
+            )
+            assert np.isclose(stress_loop, stress_np, rtol=1e-6)
+            assert np.allclose(grad_loop, grad_np, atol=1e-8)
+
+
+def test_real_edge_epsilon_keeps_real_edge_term_alive_at_alpha_one(matrices):
+    """
+    先生からのご指摘への対応: 実エッジ項の係数を(1-alpha)ではなく
+    (1-alpha+real_edge_epsilon)にすることで、alpha=1.0でも実エッジ制約が
+    完全には消えないようにする。real_edge_epsilon=0.0(既定)では従来通り
+    alpha=1.0で実エッジ項の係数が文字通り0になるが、epsilon>0ならそうならない
+    ことを、勾配ノルムで直接確認する。
+    """
+    nodes, node_idx, common_deg, weight, is_user = matrices
+    N = len(nodes)
+    rng = np.random.default_rng(0)
+    coords_flat = rng.uniform(0, 1, size=N * 2)
+    cutoff, strength = 0.3, 0.3
+
+    # epsilon=0.0(既定)では、alpha=1.0で実エッジ係数(1-alpha+0)が文字通り0になり、
+    # weight>0の重みだけを0にした行列と勾配が完全に一致するはず。
+    zero_weight = np.zeros_like(weight)
+    _, grad_no_real_edges = layout_core.stress_and_grad(
+        coords_flat, common_deg, zero_weight, 1.0, cutoff, strength, is_user, True, 0.0
+    )
+    _, grad_epsilon_zero = layout_core.stress_and_grad(
+        coords_flat, common_deg, weight, 1.0, cutoff, strength, is_user, True, 0.0
+    )
+    assert np.allclose(grad_no_real_edges, grad_epsilon_zero, atol=1e-8), (
+        "real_edge_epsilon=0.0の場合、alpha=1.0では実エッジ項が勾配に一切寄与しないはず"
+    )
+
+    # epsilon>0では、alpha=1.0でも実エッジ項が勾配に寄与し続けるはず
+    # (real_edge_epsilon無しの場合と異なる勾配になる)。
+    _, grad_epsilon_positive = layout_core.stress_and_grad(
+        coords_flat, common_deg, weight, 1.0, cutoff, strength, is_user, True, 0.05
+    )
+    assert not np.allclose(grad_no_real_edges, grad_epsilon_positive, atol=1e-6), (
+        "real_edge_epsilon>0の場合、alpha=1.0でも実エッジ項が勾配に寄与し続けるはず"
+    )
 
 
 def test_repel_same_type_changes_layout(matrices):
