@@ -14,9 +14,11 @@ from bipartite_layout.metrics import compute_cluster_metrics, compute_separation
 
 def _multi_seed_worker(args):
     """compute_layout_multi_seedの1seed分の計算(ProcessPoolExecutorに渡すため関数化)。"""
-    common_deg, weight, alpha, nodes, is_user, seed = args
+    (method, common_deg, weight, alpha, nodes, node_idx, is_user, direction_precomputed,
+     gamma, real_edge_epsilon, maxiter, seed) = args
     coords, final_stress, converged, n_iter, grad_norm = compute_layout_method(
-        "B", common_deg, weight, alpha, nodes, None, is_user, None, seed=seed, gamma=0.0
+        method, common_deg, weight, alpha, nodes, node_idx, is_user, direction_precomputed,
+        seed=seed, gamma=gamma, real_edge_epsilon=real_edge_epsilon, maxiter=maxiter
     )
     centroid_sep, nn_ratio = compute_separation_metrics(coords, is_user)
     n_clusters_user, noise_user = compute_cluster_metrics(coords, is_user)
@@ -25,15 +27,27 @@ def _multi_seed_worker(args):
             noise_user, noise_movie, converged, n_iter, grad_norm)
 
 
-def compute_layout_multi_seed(common_deg, weight, alpha, nodes, is_user, n_seeds=8, n_workers=None):
+def compute_layout_multi_seed(common_deg, weight, alpha, nodes, is_user, n_seeds=8, n_workers=None,
+                               method="B", node_idx=None, direction_precomputed=None, gamma=0.0,
+                               real_edge_epsilon=0.0, maxiter=500):
     """
-    複数のseedでレイアウトを計算し、局所解による結果のばらつきを確認する
-    (alpha混合のみ = compute_layout_method("B", gamma=0.0)を複数seedで実行)。
+    複数のseedでレイアウトを計算し、局所解による結果のばらつきを確認する。
+
+    既定(method="B", gamma=0.0)は従来通りalpha混合のみを複数seedで実行する。
+    method="C"(alpha混合+方向整列の同時最適化)で使う場合は、node_idxと
+    direction_precomputed(get_edge_direction_cachedの戻り値)、およびgammaを
+    明示的に渡す必要がある(先生からのご指摘「最適化自体が問題では」への対応:
+    非凸性による局所解のばらつきが、方向整列ありのmethod Cでも同様に効くかを
+    確認するため)。
 
     n_workersを指定すると(例: n_workers=4)、seedごとの計算をProcessPoolExecutorで
     並列実行する。デフォルトNoneは従来通り逐次実行(結果は完全に同一、速度のみ異なる)。
     """
-    tasks = [(common_deg, weight, alpha, nodes, is_user, seed) for seed in range(n_seeds)]
+    tasks = [
+        (method, common_deg, weight, alpha, nodes, node_idx, is_user, direction_precomputed,
+         gamma, real_edge_epsilon, maxiter, seed)
+        for seed in range(n_seeds)
+    ]
     results = run_worker_tasks(_multi_seed_worker, tasks, n_workers)
 
     best_coords, best_stress = None, np.inf
