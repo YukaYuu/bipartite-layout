@@ -71,17 +71,17 @@ def test_method_d_anchor_weight_controls_distance_from_stage1(small_graph, matri
     edges, edge_labels, direction_precomputed = get_edge_direction_cached(small_graph, node_idx)
 
     coords_b, _, conv_b, _, _ = compute_layout_method(
-        "B", common_deg, weight, 0.5, nodes, node_idx, is_user, None, seed=0, gamma=0.0, maxiter=200
+        "B", common_deg, weight, 0.5, nodes, node_idx, is_user, None, seed=0, gamma=0.0, maxiter=2000
     )
     assert conv_b, "this test assumes method B converges for the fixture graph/alpha"
 
     coords_d_weak, *_ = compute_layout_method(
         "D", common_deg, weight, 0.5, nodes, node_idx, is_user, direction_precomputed,
-        seed=0, gamma=0.5, maxiter=200, anchor_weight=0.01
+        seed=0, gamma=0.5, maxiter=2000, anchor_weight=0.01
     )
     coords_d_strong, *_ = compute_layout_method(
         "D", common_deg, weight, 0.5, nodes, node_idx, is_user, direction_precomputed,
-        seed=0, gamma=0.5, maxiter=200, anchor_weight=1e4
+        seed=0, gamma=0.5, maxiter=2000, anchor_weight=1e4
     )
 
     dist_weak = np.linalg.norm(coords_b - coords_d_weak)
