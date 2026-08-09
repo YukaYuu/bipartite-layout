@@ -8,6 +8,7 @@ from bipartite_layout.direction import (
     calc_edge_similarity,
     cluster_edges_by_community,
     precompute_direction_pairs,
+    precompute_direction_pairs_continuous,
 )
 from bipartite_layout.matrices import (
     build_matrices,
@@ -60,15 +61,28 @@ def get_matrices_cached(G, weight_mode, threshold_common_deg, top_k_same_type,
     return _matrices_cache[key]
 
 
-def get_edge_direction_cached(G, node_idx):
+def get_edge_direction_cached(G, node_idx, mode="cluster"):
     """
-    calc_edge_similarity + cluster_edges_by_community + precompute_direction_pairsの
-    結果をGごとにメモ化する。戻り値: (edges, edge_labels, direction_precomputed)。
+    calc_edge_similarity + cluster_edges_by_community + precompute_direction_pairs(系)の
+    結果をG・modeごとにメモ化する。戻り値: (edges, edge_labels, direction_precomputed)。
+
+    mode="cluster"(既定、既存挙動): 方向整列の対象を、Louvainで分割した同一コミュニティ内の
+    ペアだけに限定する。コミュニティ数が少ないと、レイアウト全体が少数の離散的な方向に
+    強制的に収束してしまう(格子状になる)ことがある(先生からのご指摘)。
+
+    mode="continuous": コミュニティ分割を経由せず、類似度が閾値を超える「すべての」
+    エッジペアを、類似度をそのまま重みとして方向整列の対象にする。edge_labelsは
+    (可視化での色分け用に)cluster同様に計算されるが、方向整列の力の計算には使われない。
     """
-    key = id(G)
+    key = (id(G), mode)
     if key not in _edge_direction_cache:
         edges, similarity = calc_edge_similarity(G)
         edge_labels = cluster_edges_by_community(edges, similarity, sim_threshold=0.0, resolution=1.0)
-        direction_precomputed = precompute_direction_pairs(edges, similarity, edge_labels, node_idx)
+        if mode == "cluster":
+            direction_precomputed = precompute_direction_pairs(edges, similarity, edge_labels, node_idx)
+        elif mode == "continuous":
+            direction_precomputed = precompute_direction_pairs_continuous(edges, similarity, node_idx)
+        else:
+            raise ValueError(f"unknown mode: {mode!r} (must be 'cluster' or 'continuous')")
         _edge_direction_cache[key] = (edges, edge_labels, direction_precomputed)
     return _edge_direction_cache[key]

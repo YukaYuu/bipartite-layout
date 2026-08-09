@@ -40,21 +40,18 @@ def cluster_edges_by_community(edges, similarity, sim_threshold=0.0, resolution=
     return labels
 
 
-def precompute_direction_pairs(edges, similarity, edge_labels, node_idx):
-    """
-    node_idxを受け取り、m_idx_arr/u_idx_arr(各エッジのmovie側/user側ノードの整数インデックス)を
-    ここで1回だけ計算しておく。direction_alignment_stress_and_gradは最適化の反復のたびに
-    呼ばれるため、以前のように毎回node_idx[n]の辞書引きでこれを作り直すのは無駄だった。
-    """
+def _build_edge_node_indices(edges, node_idx):
+    """各エッジのmovie側/user側ノードの整数インデックス配列を1回だけ計算する
+    (precompute_direction_pairs系関数の共通部分)。"""
     edge_m_idx, edge_u_idx = [], []
     for u, v in edges:
         m_node, u_node = (u, v) if u.startswith("m_") else (v, u)
         edge_m_idx.append(m_node)
         edge_u_idx.append(u_node)
-    pair_i, pair_j, pair_w = [], [], []
-    for (i, j), sim in similarity.items():
-        if sim > 0 and edge_labels[i] == edge_labels[j]:
-            pair_i.append(i); pair_j.append(j); pair_w.append(sim)
+    return edge_m_idx, edge_u_idx
+
+
+def _direction_pairs_dict(edges, node_idx, edge_m_idx, edge_u_idx, pair_i, pair_j, pair_w):
     return {
         "edge_m_idx": edge_m_idx, "edge_u_idx": edge_u_idx,
         "m_idx_arr": np.array([node_idx[n] for n in edge_m_idx], dtype=np.int64),
@@ -63,6 +60,50 @@ def precompute_direction_pairs(edges, similarity, edge_labels, node_idx):
         "pair_j": np.array(pair_j, dtype=np.int64),
         "pair_w": np.array(pair_w, dtype=np.float64),
     }
+
+
+def precompute_direction_pairs(edges, similarity, edge_labels, node_idx):
+    """
+    node_idxを受け取り、m_idx_arr/u_idx_arr(各エッジのmovie側/user側ノードの整数インデックス)を
+    ここで1回だけ計算しておく。direction_alignment_stress_and_gradは最適化の反復のたびに
+    呼ばれるため、以前のように毎回node_idx[n]の辞書引きでこれを作り直すのは無駄だった。
+
+    edge_labels(Louvainによる離散的なコミュニティ分割)が同じペアだけを対象にする。
+    少数の離散的なコミュニティに強制的に分割されるため、コミュニティ数が少ないと
+    レイアウト全体が少数の離散的な方向に収束してしまう(格子状になる)ことがある
+    (先生からのご指摘)。連続的な代替はprecompute_direction_pairs_continuousを参照。
+    """
+    edge_m_idx, edge_u_idx = _build_edge_node_indices(edges, node_idx)
+    pair_i, pair_j, pair_w = [], [], []
+    for (i, j), sim in similarity.items():
+        if sim > 0 and edge_labels[i] == edge_labels[j]:
+            pair_i.append(i); pair_j.append(j); pair_w.append(sim)
+    return _direction_pairs_dict(edges, node_idx, edge_m_idx, edge_u_idx, pair_i, pair_j, pair_w)
+
+
+def precompute_direction_pairs_continuous(edges, similarity, node_idx, sim_threshold=0.0):
+    """
+    precompute_direction_pairsの代替版: Louvainによる離散的なコミュニティ分割を経由せず、
+    similarity > sim_thresholdを満たす「すべての」エッジペアを対象に、類似度をそのまま
+    重みとして使う(先生の「方向整列のせいで格子状になっているのはおかしい」という
+    ご指摘への対応)。
+
+    既存版(precompute_direction_pairs)は、エッジをLouvainで少数の離散的なコミュニティに
+    分割し、「同じコミュニティに属するペアだけ」を方向整列の対象にしていた。類似度が
+    わずかに閾値を超えるかどうかで「揃える/揃えない」が二値的に切り替わり、かつ
+    コミュニティ数が少ないと(実データで3個)、レイアウト全体がその少数の離散的な方向に
+    強制的に収束してしまっていた(gamma=0 vs gamma=1の比較画像で確認済み: gamma=1で
+    明確な格子状の帯ができる)。
+
+    この版では「多少似ている」ペアは弱く、「非常に似ている」ペアは強く方向を揃えようと
+    する連続的な力になり、少数の離散的な方向への不自然な強制が起きにくくなるはず。
+    """
+    edge_m_idx, edge_u_idx = _build_edge_node_indices(edges, node_idx)
+    pair_i, pair_j, pair_w = [], [], []
+    for (i, j), sim in similarity.items():
+        if sim > sim_threshold:
+            pair_i.append(i); pair_j.append(j); pair_w.append(sim)
+    return _direction_pairs_dict(edges, node_idx, edge_m_idx, edge_u_idx, pair_i, pair_j, pair_w)
 
 
 def _direction_alignment_numpy(coords_flat, N, m_idx_arr, u_idx_arr, pair_i, pair_j, pair_w):

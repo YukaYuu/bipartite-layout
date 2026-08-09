@@ -34,3 +34,41 @@ def test_direction_alignment_score_is_normalized(small_graph, matrices):
     score = direction.calc_direction_alignment_score(coords, nodes, node_idx, direction_precomputed)
     assert not np.isnan(score)
     assert 0.0 <= score <= 1.0
+
+
+def test_continuous_mode_is_not_restricted_to_same_community_pairs(small_graph, matrices):
+    """
+    先生からのご指摘への対応: mode="cluster"(既定)は、Louvainで分割した同一
+    コミュニティ内のペアだけを方向整列の対象にするため、コミュニティ数が少ないと
+    レイアウト全体が少数の離散的な方向に強制収束してしまう(格子状になる)。
+    mode="continuous"はコミュニティ分割を経由せず、類似度が閾値を超えるすべての
+    ペアを対象にするため、対象ペア数がcluster版以上になるはず(異なるコミュニティに
+    属していたせいで除外されていたペアも含まれるようになるため)。
+    """
+    nodes, node_idx, common_deg, weight, is_user = matrices
+    _, edge_labels_cluster, cluster_precomputed = get_edge_direction_cached(
+        small_graph, node_idx, mode="cluster"
+    )
+    _, edge_labels_continuous, continuous_precomputed = get_edge_direction_cached(
+        small_graph, node_idx, mode="continuous"
+    )
+
+    n_communities = len(set(edge_labels_cluster.tolist()))
+    n_pairs_cluster = len(cluster_precomputed["pair_i"])
+    n_pairs_continuous = len(continuous_precomputed["pair_i"])
+
+    # edge_labelsは可視化用の色分けとして両モードで同じロジックにより計算される。
+    assert np.array_equal(edge_labels_cluster, edge_labels_continuous)
+    # 複数コミュニティが存在する限り、continuousの方が対象ペア数が真に多いはず
+    # (異なるコミュニティ間のペアも含まれるようになるため)。
+    if n_communities > 1:
+        assert n_pairs_continuous > n_pairs_cluster
+
+
+def test_get_edge_direction_cached_rejects_unknown_mode(small_graph, matrices):
+    nodes, node_idx, common_deg, weight, is_user = matrices
+    try:
+        get_edge_direction_cached(small_graph, node_idx, mode="bogus")
+        assert False, "expected ValueError for an unknown mode"
+    except ValueError:
+        pass
