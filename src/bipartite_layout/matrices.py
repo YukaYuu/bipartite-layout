@@ -53,6 +53,16 @@ def build_matrices(G, threshold_common_deg=None, top_k_same_type=None, mutual_to
         n_after_th = int(np.sum(common_deg > 0))
         print(f"閾値 {threshold_common_deg} 適用: 仮想エッジ数 {n_before_th} → {n_after_th}")
 
+    # 仮想エッジ(common_deg)をweightと同じ[0.4, 1.0]に正規化する(先生からのご指摘への
+    # 対応: 実エッジはweightで正規化しているのに、仮想エッジには対応する正規化が無い
+    # 非対称性があった)。top-k絞り込み・閾値フィルタより後に行うことで、
+    # threshold_common_degが生のJaccard類似度のスケールで機能する意味を保つ。
+    nonzero_common = common_deg > 0
+    if nonzero_common.any():
+        nz_common = common_deg[nonzero_common]
+        normalized_common = (nz_common - nz_common.min()) / (nz_common.max() - nz_common.min() + 1e-9)
+        common_deg[nonzero_common] = 0.4 + 0.6 * normalized_common
+
     n_user_edges = int(np.sum(common_deg[np.ix_(is_user, is_user)] > 0) / 2)
     n_movie_edges = int(np.sum(common_deg[np.ix_(~is_user, ~is_user)] > 0) / 2)
     n_user_nodes = int(is_user.sum())
@@ -93,6 +103,11 @@ def build_matrices_uniform_weight(G, threshold_common_deg=None, top_k_same_type=
         common_deg = apply_top_k_sparsification(common_deg, is_user, top_k_same_type, mutual_top_k_only)
     if threshold_common_deg is not None:
         common_deg[common_deg < threshold_common_deg] = 0.0
+    nonzero_common = common_deg > 0
+    if nonzero_common.any():
+        nz_common = common_deg[nonzero_common]
+        normalized_common = (nz_common - nz_common.min()) / (nz_common.max() - nz_common.min() + 1e-9)
+        common_deg[nonzero_common] = 0.4 + 0.6 * normalized_common
     return nodes, idx, common_deg, weight, is_user
 
 
@@ -192,6 +207,13 @@ def build_matrices_commonality_weight(G, threshold_common_deg=None, top_k_same_t
         common_deg[common_deg < threshold_common_deg] = 0.0
         n_after_th = int(np.sum(common_deg > 0))
         print(f"閾値 {threshold_common_deg} 適用: 仮想エッジ数 {n_before_th} → {n_after_th}")
+
+    # 仮想エッジをweightと同じ[0.4, 1.0]に正規化する(build_matricesと同じ対応)。
+    nonzero_common = common_deg > 0
+    if nonzero_common.any():
+        nz_common = common_deg[nonzero_common]
+        normalized_common = (nz_common - nz_common.min()) / (nz_common.max() - nz_common.min() + 1e-9)
+        common_deg[nonzero_common] = 0.4 + 0.6 * normalized_common
 
     n_user_edges = int(np.sum(common_deg[np.ix_(is_user, is_user)] > 0) / 2)
     n_movie_edges = int(np.sum(common_deg[np.ix_(~is_user, ~is_user)] > 0) / 2)
