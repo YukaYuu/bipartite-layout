@@ -32,7 +32,7 @@ def _shape_distance(coords_a, coords_b):
 
 
 def _draw_koala_row(axes_row, ctx, alphas, real_weight_mode, real_edge_epsilon=0.1,
-                     attr_exponent=3.0, seed=0, maxiter=2000, row_label=None):
+                     attr_exponent=3.0, seed=0, maxiter=6000, row_label=None):
     """axes_row(1行分のAxes配列)に、alphaを動かしながらkoalaレイアウトを描画する。
     複数の設定を縦に並べて比較する図(plot_koala_real_edge_comparisonなど)と、
     1設定だけの図(_plot_koala_sweep)の両方から共通して使われる。"""
@@ -70,7 +70,7 @@ def _draw_koala_row(axes_row, ctx, alphas, real_weight_mode, real_edge_epsilon=0
 
 
 def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, real_edge_epsilon=0.1,
-                       attr_exponent=3.0, seed=0, maxiter=2000):
+                       attr_exponent=3.0, seed=0, maxiter=6000):
     fig, axes = plt.subplots(1, len(alphas), figsize=(4.0 * len(alphas), 4.4))
     fig.suptitle(f"koala alpha sweep -- {title_suffix}", fontsize=11)
     _draw_koala_row(axes, ctx, alphas, real_weight_mode, real_edge_epsilon, attr_exponent, seed, maxiter)
@@ -78,7 +78,7 @@ def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, rea
 
 
 def plot_koala_real_edge_comparison(ctx, alphas, filename="koala_real_edge_comparison.png",
-                                     real_edge_epsilon=0.1, attr_exponent=1.0, seed=0, maxiter=2000):
+                                     real_edge_epsilon=0.1, attr_exponent=1.0, seed=0, maxiter=6000):
     """
     先生・共同研究者からのご指摘: 「実エッジの重みを仮想エッジと逆(どんどん小さくなって
     いく)の働きで追加した場合」(=epsilon_floor)と、「実エッジの重みは追加しない場合」
@@ -97,7 +97,7 @@ def plot_koala_real_edge_comparison(ctx, alphas, filename="koala_real_edge_compa
 
 
 def plot_koala_epsilon_floor(ctx, alphas, filename="koala_epsilon_floor_fine.png", real_edge_epsilon=0.1,
-                              seed=0, maxiter=2000):
+                              seed=0, maxiter=6000):
     """koala_epsilon_floor.pngと同じ設定(attrExp=1.0の真のLinLogクラスタリング指数)を、
     好きなalpha刻みで生成する(0.1刻みで細かく見たい場合など)。"""
     _plot_koala_sweep(
@@ -108,7 +108,7 @@ def plot_koala_epsilon_floor(ctx, alphas, filename="koala_epsilon_floor_fine.png
     )
 
 
-def run_koala_comparison(ctx, alphas=None, seed=0, maxiter=2000):
+def run_koala_comparison(ctx, alphas=None, seed=0, maxiter=6000):
     """3つの設定を比較する画像を生成する(カレントディレクトリに保存)。"""
     if alphas is None:
         alphas = [0.0, 0.5, 0.85, 0.94, 1.0]
