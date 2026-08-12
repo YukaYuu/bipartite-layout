@@ -101,10 +101,17 @@ def compute_linlog_layout(attr_weight, seed=0, maxiter=1000, repu_exponent=0.0, 
 
     barycenter = x0.reshape(N, 2).mean(axis=0)
 
+    # scipyのL-BFGS-Bはデフォルトでftol(相対的な目的関数値の変化)による早期終了を
+    # 行うが、attr_exponentが大きいほどエネルギーの絶対値スケールが大きくなり
+    # (dist^3 vs dist^1)、勾配ノルムがまだ大きいのに「CONVERGENCE: RELATIVE
+    # REDUCTION OF F <= FACTR*EPSMCH」で見かけ上収束したと判定されてしまう
+    # (実際にattr_exponent=3.0で確認: grad_norm=0.36のまま停止し、maxiterを
+    # 2000→8000にしても変化しなかった)。ftol/gtolを十分小さくして、この
+    # 見せかけの収束を防ぐ。
     result = minimize(
         linlog_stress_and_grad, x0,
         args=(attr_weight, repu_exponent, attr_exponent, grav_factor, barycenter),
-        jac=True, method="L-BFGS-B", options={"maxiter": maxiter},
+        jac=True, method="L-BFGS-B", options={"maxiter": maxiter, "ftol": 1e-15, "gtol": 1e-10},
     )
     grad_norm = np.linalg.norm(result.jac)
     return result.x.reshape(N, 2), result.fun, result.success, result.nit, grad_norm
