@@ -31,15 +31,14 @@ def _shape_distance(coords_a, coords_b):
     return float(np.linalg.norm(da - db) / (np.linalg.norm(da) + 1e-12))
 
 
-def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, real_edge_epsilon=0.1,
-                       attr_exponent=3.0, seed=0, maxiter=2000):
-    fig, axes = plt.subplots(1, len(alphas), figsize=(4.0 * len(alphas), 4.4))
-    fig.suptitle(f"koala alpha sweep -- {title_suffix}", fontsize=11)
-
+def _draw_koala_row(axes_row, ctx, alphas, real_weight_mode, real_edge_epsilon=0.1,
+                     attr_exponent=3.0, seed=0, maxiter=2000, row_label=None):
+    """axes_row(1行分のAxes配列)に、alphaを動かしながらkoalaレイアウトを描画する。
+    複数の設定を縦に並べて比較する図(plot_koala_real_edge_comparisonなど)と、
+    1設定だけの図(_plot_koala_sweep)の両方から共通して使われる。"""
     edges = list(ctx.G.edges())
     prev_coords = None
-    prev_shape_dist = None
-    for ax, a in zip(axes, alphas):
+    for ax, a in zip(axes_row, alphas):
         x0 = prev_coords.flatten() if prev_coords is not None else None
         coords, _, converged, _, _ = compute_koala_alpha_layout(
             ctx.common_deg, ctx.weight, a, seed=seed, maxiter=maxiter, x0=x0,
@@ -49,7 +48,7 @@ def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, rea
         shape_dist = _shape_distance(coords, prev_coords) if prev_coords is not None else None
         prev_coords = coords
 
-        sep, nn_ratio = compute_separation_metrics(coords, ctx.is_user)
+        _, nn_ratio = compute_separation_metrics(coords, ctx.is_user)
         align = calc_direction_alignment_score(coords, ctx.nodes, ctx.node_idx, ctx.direction_precomputed)
 
         for (u, v) in edges:
@@ -65,8 +64,35 @@ def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, rea
                      fontsize=9, color=("black" if converged else "red"))
         ax.set_xticks([]); ax.set_yticks([])
         if a == alphas[0]:
+            if row_label:
+                ax.set_ylabel(row_label, fontsize=10)
             ax.legend(fontsize=8)
 
+
+def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, real_edge_epsilon=0.1,
+                       attr_exponent=3.0, seed=0, maxiter=2000):
+    fig, axes = plt.subplots(1, len(alphas), figsize=(4.0 * len(alphas), 4.4))
+    fig.suptitle(f"koala alpha sweep -- {title_suffix}", fontsize=11)
+    _draw_koala_row(axes, ctx, alphas, real_weight_mode, real_edge_epsilon, attr_exponent, seed, maxiter)
+    save_figure(fig, filename, dpi=130)
+
+
+def plot_koala_real_edge_comparison(ctx, alphas, filename="koala_real_edge_comparison.png",
+                                     real_edge_epsilon=0.1, attr_exponent=1.0, seed=0, maxiter=2000):
+    """
+    先生・共同研究者からのご指摘: 「実エッジの重みを仮想エッジと逆(どんどん小さくなって
+    いく)の働きで追加した場合」(=epsilon_floor)と、「実エッジの重みは追加しない場合」
+    (=real_weight_mode="none", 全alphaでreal_component=0)を、同じalpha刻みで
+    直接比較する図。上段がepsilon_floor、下段がnone。
+    """
+    fig, axes = plt.subplots(2, len(alphas), figsize=(4.0 * len(alphas), 8.8))
+    fig.suptitle(
+        "koala: real edge weight present (shrinking, top) vs absent entirely (bottom)", fontsize=11
+    )
+    _draw_koala_row(axes[0], ctx, alphas, "epsilon_floor", real_edge_epsilon, attr_exponent, seed, maxiter,
+                     row_label="real edge:\n(1-a)+eps")
+    _draw_koala_row(axes[1], ctx, alphas, "none", real_edge_epsilon, attr_exponent, seed, maxiter,
+                     row_label="real edge:\nnone")
     save_figure(fig, filename, dpi=130)
 
 

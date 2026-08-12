@@ -112,7 +112,7 @@ def compute_linlog_layout(attr_weight, seed=0, maxiter=1000, repu_exponent=0.0, 
 
 def compute_koala_alpha_layout(common_deg, weight, alpha, seed=0, maxiter=1000, x0=None,
                                 repu_exponent=0.0, attr_exponent=3.0, grav_factor=0.0001,
-                                real_weight_mode="constant"):
+                                real_weight_mode="constant", real_edge_epsilon=0.1):
     """
     先生の提案: 「α=0からα=1まで、常にkoala(LinLogエネルギーモデル)でレイアウトする。
     αを大きくするにつれて仮想エッジの重みを加えていく」を実装したもの。
@@ -120,15 +120,32 @@ def compute_koala_alpha_layout(common_deg, weight, alpha, seed=0, maxiter=1000, 
     real_weight_mode:
       "constant": 実エッジの重みはalphaに関わらず固定(weightそのまま)。先生からの
         最初の提案「実エッジ項の計算をKoalaの計算に置き換えた上で、alphaを大きくする
-        につれて仮想エッジの重みを加えていく」に対応。
+        につれて仮想エッジの重みを加えていく」に対応。連続性は保たれるが、sep/nn_ratio
+        がほぼ動かず、alphaを変える意味が薄れることが実験的に分かっている。
       "one_minus_alpha": 実エッジの重みも(1-alpha)でalpha依存にする。先生からの
         「alphaの値に応じて仮想エッジだけでなく実エッジの重みも変動させた方がいいか、
         という点については試してみないとわからない」という未検証の問いに対応。
+        alpha=0.85〜0.97では分離が滑らかに強まるが、alpha=1.0で係数が文字通り0になり、
+        stress majorization版と同じ破局的なジャンプが再現されることが実験的に分かっている。
+      "epsilon_floor": one_minus_alphaと同じだが、係数を(1-alpha)ではなく
+        (1-alpha)+real_edge_epsilonにし、alpha=1.0でも実エッジ項が完全には消えない
+        ようにする(元のstress majorization版で有効だったreal_edge_epsilonの考え方を、
+        このKoala/LinLogベースの機構にも適用したもの)。
+      "none": 実エッジを一切使わない(全alphaでreal_component=0)。attr_weightは
+        alpha*common_degのみになる。「実エッジを(1-alpha)のように弱めながら残す」
+        のではなく「実エッジをそもそも一切使わない」場合との比較用
+        (先生・共同研究者からのご指摘: この比較がまだ行われていなかった)。
+        alpha=0では仮想エッジの重みも0になるため、誘引力が完全に無い(反発のみの)
+        退化したレイアウトになることに注意。
     """
     if real_weight_mode == "constant":
         real_component = weight
     elif real_weight_mode == "one_minus_alpha":
         real_component = (1.0 - alpha) * weight
+    elif real_weight_mode == "epsilon_floor":
+        real_component = ((1.0 - alpha) + real_edge_epsilon) * weight
+    elif real_weight_mode == "none":
+        real_component = np.zeros_like(weight)
     else:
         raise ValueError(f"unknown real_weight_mode: {real_weight_mode!r}")
 
