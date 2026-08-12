@@ -70,6 +70,18 @@ def _plot_koala_sweep(ctx, alphas, filename, title_suffix, real_weight_mode, rea
     save_figure(fig, filename, dpi=130)
 
 
+def plot_koala_epsilon_floor(ctx, alphas, filename="koala_epsilon_floor_fine.png", real_edge_epsilon=0.1,
+                              seed=0, maxiter=2000):
+    """koala_epsilon_floor.pngと同じ設定(attrExp=1.0の真のLinLogクラスタリング指数)を、
+    好きなalpha刻みで生成する(0.1刻みで細かく見たい場合など)。"""
+    _plot_koala_sweep(
+        ctx, alphas, filename,
+        "real weight = (1-alpha)+eps, attrExp=1.0 (true LinLog clustering)",
+        real_weight_mode="epsilon_floor", real_edge_epsilon=real_edge_epsilon, attr_exponent=1.0,
+        seed=seed, maxiter=maxiter,
+    )
+
+
 def run_koala_comparison(ctx, alphas=None, seed=0, maxiter=2000):
     """3つの設定を比較する画像を生成する(カレントディレクトリに保存)。"""
     if alphas is None:
